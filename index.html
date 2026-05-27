@@ -1848,22 +1848,37 @@ async function loadData() {
   const refreshBtn = document.getElementById("refresh-btn");
   body.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div>Загрузка данных...</div></div>`;
   if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = "⏳"; }
-  try {
-    const resp = await fetch(GOOGLE_SCRIPT_URL);
-    const data = await resp.json();
-    allData = Array.isArray(data) ? data : [];
+
+  // Google Apps Script requires no-cors for POST but supports JSONP for GET
+  // We use a callback-based JSONP approach to avoid CORS errors
+  const callbackName = "gsCallback_" + Date.now();
+  const script = document.createElement("script");
+  const timeout = setTimeout(() => {
+    cleanup();
+    body.innerHTML = `<div class="empty-wrap"><div class="empty-icon">⚠️</div><div style="font-weight:600;margin-bottom:6px">Ошибка загрузки</div><div style="font-size:12px;color:var(--muted)">Проверьте настройки Apps Script</div></div>`;
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = "↻ Обновить"; }
+  }, 10000);
+
+  function cleanup() {
+    clearTimeout(timeout);
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }
+
+  window[callbackName] = function(data) {
+    cleanup();
+    allData = Array.isArray(data) ? data.reverse() : [];
     if (allData.length === 0) {
       body.innerHTML = `<div class="empty-wrap"><div class="empty-icon">📭</div><div style="font-weight:600;margin-bottom:6px">Результатов пока нет</div><div style="font-size:12px;color:var(--muted)">Они появятся здесь после прохождения теста</div></div>`;
-      return;
+    } else {
+      updateStats();
+      applyFilters();
     }
-    updateStats();
-    applyFilters();
-  } catch(e) {
-    body.innerHTML = `<div class="empty-wrap"><div class="empty-icon">⚠️</div><div style="font-weight:600;margin-bottom:6px">Ошибка загрузки</div><div style="font-size:12px;color:var(--muted)">${e.message}</div></div>`;
-    console.error(e);
-  } finally {
     if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = "↻ Обновить"; }
-  }
+  };
+
+  script.src = GOOGLE_SCRIPT_URL + "?callback=" + callbackName;
+  document.head.appendChild(script);
 }
 
 

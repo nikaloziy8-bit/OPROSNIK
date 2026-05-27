@@ -1551,6 +1551,9 @@ let userData = {};
 function goTo(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  // hide admin panels when navigating quiz
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "none";
 
 }
 
@@ -2037,18 +2040,27 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModalBt
 // ── Admin hash routing ──
 function checkAdminRoute() {
   const isAdmin = window.location.hash === "#admin";
-  document.getElementById("login-screen").style.display = isAdmin ? "flex" : "none";
-  document.getElementById("app").style.display = "none";
+  const loginEl = document.getElementById("login-screen");
+  const appEl = document.getElementById("app");
+  if (!loginEl) return; // DOM not ready
   if (isAdmin) {
+    loginEl.style.display = "flex";
+    appEl.style.display = "none";
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   } else {
-    // Ensure quiz is visible
+    loginEl.style.display = "none";
+    appEl.style.display = "none";
     const active = document.querySelector(".screen.active");
     if (!active) document.getElementById("screen-author").classList.add("active");
   }
 }
 window.addEventListener("hashchange", checkAdminRoute);
-checkAdminRoute();
+// Run after DOM is fully ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", checkAdminRoute);
+} else {
+  checkAdminRoute();
+}
 
 </script>
 </body>

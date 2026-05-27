@@ -1494,11 +1494,9 @@ body {
 
 <script>
 // ============================================================
-//  SUPABASE CONFIG — вставьте свои данные после регистрации
-//  https://supabase.com → New Project → Settings → API
+//  GOOGLE SHEETS CONFIG
 // ============================================================
-var SUPABASE_URL = "ВСТАВЬТЕ_SUPABASE_URL";       // https://xxxx.supabase.co
-var SUPABASE_ANON_KEY = "ВСТАВЬТЕ_ANON_KEY";      // eyJh...
+var GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKxqiIFJIuznxlemE1j23gLqAL81qms1Ez-dHWH56MCL-qmIRH5T_4jYiE-4frYa0-_Q/exec";
 
 const questions = [
   { text: "Пару месяцев назад у вас завязались новые отношения, и вы впервые выбрались вместе на выходных в небольшое путешествие. Кажется, что все прошло идеально, но после возвращения домой ваш партнер узнал, что его младшего ребенка обижают хулиганы, и ему нужно несколько дней на то, чтобы разобраться с этой проблемой до вашего следующего свидания.", options: [{ letter:"А", text:"Вы все понимаете и, чтобы помочь, отправляете по почте список консультантов и статей о хулиганстве, несмотря на то что вас никто об этом не просил.", value:"A" },{ letter:"Б", text:"Вы прекрасно понимаете, что такая ситуация может быть очень болезненной и стрессовой. Вы сообщаете, что будете рады увидеться при первой возможности и что готовы пообщаться по телефону или с помощью сообщений, когда все немного наладится.", value:"B" },{ letter:"В", text:"Вначале вы хотите проявить сочувствие, но затем начинаете злиться, что вас отодвинули на задний план. Вы отправляете сообщение о необходимости научиться совмещать ваши отношения с родительскими обязанностями.", value:"C" },{ letter:"Г", text:"Вы уверены в том, что во время вашей поездки партнер узнал о вас что-то новое и возненавидел вас. Это всего лишь способ подготовить почву для разрыва отношений.", value:"D" }] },
@@ -1613,34 +1611,24 @@ async function finishQuiz() {
   const counts = { A:0, B:0, C:0, D:0 };
   answers.forEach(a => { if (a) counts[a]++; });
   try {
-    if (SUPABASE_URL !== "ВСТАВЬТЕ_SUPABASE_URL") {
-      const payload = {
-        created_at: new Date().toISOString(),
-        name: userData.name,
-        phone: userData.phone,
-        telegram: userData.tg,
-        answers: answers.join(","),
-        count_a: counts.A,
-        count_b: counts.B,
-        count_c: counts.C,
-        count_d: counts.D,
-        result_key: resultKey,
-        result_title: result.tag,
-        q1: answers[0], q2: answers[1], q3: answers[2], q4: answers[3], q5: answers[4],
-        q6: answers[5], q7: answers[6], q8: answers[7], q9: answers[8], q10: answers[9]
-      };
-      const resp = await fetch(`${SUPABASE_URL}/rest/v1/quiz_results`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON_KEY,
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify(payload)
-      });
-      if (resp.ok) showToast("Данные сохранены");
-    }
+    const payload = {
+      created_at: new Date().toLocaleString("ru-RU"),
+      name: userData.name,
+      phone: userData.phone,
+      telegram: userData.tg,
+      result_key: resultKey,
+      result_title: result.tag,
+      q1: answers[0], q2: answers[1], q3: answers[2], q4: answers[3], q5: answers[4],
+      q6: answers[5], q7: answers[6], q8: answers[7], q9: answers[8], q10: answers[9],
+      count_a: counts.A, count_b: counts.B, count_c: counts.C, count_d: counts.D
+    };
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    showToast("Результат сохранён");
   } catch(e) { console.warn(e); }
   setTimeout(() => {
     document.getElementById("result-tag").textContent = result.tag;
@@ -1691,6 +1679,7 @@ function showToast(msg) {
       <div class="topbar-badge" id="total-badge">0 записей</div>
     </div>
     <div class="topbar-right">
+      <button id="refresh-btn" class="refresh-btn" onclick="loadData()">↻ Обновить</button>
       <button class="logout-btn" onclick="doLogout()">Выйти</button>
     </div>
   </div>
@@ -1784,7 +1773,6 @@ function showToast(msg) {
 // ============================================================
 //  CONFIG — замените на свои данные Supabase
 // ============================================================
-// SUPABASE_URL и SUPABASE_ANON_KEY берутся из конфига выше
 var ADMIN_PASSWORD = "zhanna2025";  // ← Измените пароль!
 
 // ============================================================
@@ -1856,43 +1844,28 @@ function doLogout() {
 //  DATA LOADING
 // ============================================================
 async function loadData() {
+  const body = document.getElementById("table-body");
+  const refreshBtn = document.getElementById("refresh-btn");
+  body.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div>Загрузка данных...</div></div>`;
+  if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.innerHTML = "⏳"; }
   try {
-    if (SUPABASE_URL === "ВСТАВЬТЕ_SUPABASE_URL") {
-      // Demo mode — fake data
-      allData = generateDemoData();
-    } else {
-      const resp = await fetch(
-        `${SUPABASE_URL}/rest/v1/quiz_results?select=*&order=created_at.desc&limit=1000`,
-        { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
-      );
-      allData = await resp.json();
+    const resp = await fetch(GOOGLE_SCRIPT_URL);
+    const data = await resp.json();
+    allData = Array.isArray(data) ? data : [];
+    if (allData.length === 0) {
+      body.innerHTML = `<div class="empty-wrap"><div class="empty-icon">📭</div><div style="font-weight:600;margin-bottom:6px">Результатов пока нет</div><div style="font-size:12px;color:var(--muted)">Они появятся здесь после прохождения теста</div></div>`;
+      return;
     }
     updateStats();
     applyFilters();
   } catch(e) {
-    document.getElementById("table-body").innerHTML = `<div class="empty-wrap"><div class="empty-icon">⚠️</div><div>Ошибка загрузки данных</div></div>`;
+    body.innerHTML = `<div class="empty-wrap"><div class="empty-icon">⚠️</div><div style="font-weight:600;margin-bottom:6px">Ошибка загрузки</div><div style="font-size:12px;color:var(--muted)">${e.message}</div></div>`;
+    console.error(e);
+  } finally {
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = "↻ Обновить"; }
   }
 }
 
-function generateDemoData() {
-  const names = ["Анна К.", "Мария П.", "Елена С.", "Ольга В.", "Наталья Р.", "Ирина М.", "Татьяна Л.", "Светлана Ж."];
-  const results = ["B","A","C","D","C","B","D","A"];
-  return names.map((name, i) => ({
-    id: i+1,
-    created_at: new Date(Date.now() - i * 86400000 * 2).toISOString(),
-    name,
-    phone: `+7 (9${10+i}${i}) ${100+i}-${10+i}-${20+i}`,
-    telegram: `@user_${name.toLowerCase().replace(" ","_").replace(".","").replace(".", "")}`,
-    result_key: results[i],
-    result_title: RESULT_FULL[results[i]].tag,
-    q1: ["A","B","C","D"][i%4], q2: ["B","C","D","A"][i%4],
-    q3: ["C","D","A","B"][i%4], q4: ["D","A","B","C"][i%4],
-    q5: ["A","B","C","D"][(i+1)%4], q6: ["B","C","D","A"][(i+1)%4],
-    q7: ["C","D","A","B"][(i+1)%4], q8: ["D","A","B","C"][(i+1)%4],
-    q9: ["A","B","C","D"][(i+2)%4], q10: ["B","C","D","A"][(i+2)%4],
-    count_a: 2+i%3, count_b: 3-i%2, count_c: 2+i%2, count_d: 3-i%3
-  }));
-}
 
 // ============================================================
 //  STATS
